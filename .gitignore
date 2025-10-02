@@ -11,3 +11,4 @@ build/
 .idea/
 temp/
 jsconfig.json
+.npmrc
