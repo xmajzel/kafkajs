@@ -1,7 +1,7 @@
 const createSocket = require('./socket')
 const createRequest = require('../protocol/request')
 const Decoder = require('../protocol/decoder')
-const { KafkaJSConnectionError, KafkaJSConnectionClosedError } = require('../errors')
+const { KafkaJSConnectionError, KafkaJSConnectionClosedError, isRebalancing } = require('../errors')
 const { INT_32_MAX_VALUE } = require('../constants')
 const getEnv = require('../env')
 const RequestQueue = require('./requestQueue')
@@ -10,6 +10,8 @@ const sharedPromiseTo = require('../utils/sharedPromiseTo')
 const Long = require('../utils/long')
 const SASLAuthenticator = require('../broker/saslAuthenticator')
 const apiKeys = require('../protocol/requests/apiKeys')
+// Throttle Heartbeat+rebalance logs to reduce noise
+const HEARTBEAT_REBALANCE_LOG_THROTTLE_MS = 100
 
 const requestInfo = ({ apiName, apiKey, apiVersion }) =>
   `${apiName}(key: ${apiKey}, version: ${apiVersion})`
@@ -113,6 +115,7 @@ module.exports = class Connection {
 
     this.logDebug = log('debug')
     this.logError = log('error')
+    this.logNotice = log('notice')
 
     const env = getEnv()
     this.shouldLogBuffers = env.KAFKAJS_DEBUG_PROTOCOL_BUFFERS === '1'
@@ -122,6 +125,8 @@ module.exports = class Connection {
     this.authenticatedAt = null
     this.sessionLifetime = Long.ZERO
     this.supportAuthenticationProtocol = null
+    // last time we logged a Heartbeat+rebalance notice
+    this.lastHeartbeatRebalanceLogAt = 0
 
     /**
      * @private
@@ -441,11 +446,24 @@ module.exports = class Connection {
       return data
     } catch (e) {
       if (logResponseError) {
-        this.logError(`Response ${requestInfo(entry)}`, {
-          error: e.message,
-          correlationId,
-          size,
-        })
+        const isHeartbeatRebalance = entry.apiName === 'Heartbeat' && isRebalancing(e)
+        if (isHeartbeatRebalance) {
+          const now = Date.now()
+          if (now - this.lastHeartbeatRebalanceLogAt >= HEARTBEAT_REBALANCE_LOG_THROTTLE_MS) {
+            this.lastHeartbeatRebalanceLogAt = now
+            this.logNotice(`Response ${requestInfo(entry)}`, {
+              error: e.message,
+              correlationId,
+              size,
+            })
+          }
+        } else {
+          this.logError(`Response ${requestInfo(entry)}`, {
+            error: e.message,
+            correlationId,
+            size,
+          })
+        }
       }
 
       const isBuffer = Buffer.isBuffer(payload)

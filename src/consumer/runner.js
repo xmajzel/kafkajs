@@ -113,7 +113,7 @@ module.exports = class Runner extends EventEmitter {
         await this.fetchManager.start()
       } catch (e) {
         if (isRebalancing(e)) {
-          this.logger.warn('The group is rebalancing, re-joining', {
+          this.logger.notice('The group is rebalancing, re-joining', {
             groupId: this.consumerGroup.groupId,
             memberId: this.consumerGroup.memberId,
             error: e.message,
