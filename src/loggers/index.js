@@ -4,6 +4,7 @@ const LEVELS = {
   NOTHING: 0,
   ERROR: 1,
   WARN: 2,
+  NOTICE: 3,
   INFO: 4,
   DEBUG: 5,
 }
@@ -45,10 +46,11 @@ const createLogger = ({ level = LEVELS.INFO, logCreator } = {}) => {
   const createLogFunctions = (namespace, namespaceLogLevel = null) => {
     const currentLogLevel = () => (namespaceLogLevel == null ? logLevel : namespaceLogLevel)
     const logger = {
-      info: createLevel('INFO', LEVELS.INFO, currentLogLevel, namespace, logFunction),
-      error: createLevel('ERROR', LEVELS.ERROR, currentLogLevel, namespace, logFunction),
-      warn: createLevel('WARN', LEVELS.WARN, currentLogLevel, namespace, logFunction),
       debug: createLevel('DEBUG', LEVELS.DEBUG, currentLogLevel, namespace, logFunction),
+      info: createLevel('INFO', LEVELS.INFO, currentLogLevel, namespace, logFunction),
+      notice: createLevel('NOTICE', LEVELS.NOTICE, currentLogLevel, namespace, logFunction),
+      warn: createLevel('WARN', LEVELS.WARN, currentLogLevel, namespace, logFunction),
+      error: createLevel('ERROR', LEVELS.ERROR, currentLogLevel, namespace, logFunction),
     }
 
     return assign(logger, {
